@@ -2,6 +2,7 @@ package org.example.verticle;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -9,12 +10,15 @@ import io.vertx.ext.mongo.MongoClient;
 
 public class MongoDbVerticle extends AbstractVerticle {
     private MongoClient client;
+
     @Override
     public void start() {
         client = MongoClient.createShared(vertx, new JsonObject()
                 .put("db_name", "my_DB"));
         vertx.eventBus().consumer("database.save", this::saveDb);
         vertx.eventBus().consumer("getHistory", this::getHistory);
+        vertx.eventBus().consumer("getPicture", this::getPict);
+        vertx.eventBus().consumer("savePicture", this::savePict);
     }
 
     private void getHistory(Message<String> message) {
@@ -22,14 +26,33 @@ public class MongoDbVerticle extends AbstractVerticle {
                 result -> message.reply(Json.encode(result.result()))
         );
     }
+
+    private void getPict(Message<String> message) {
+        client.find("picture", new JsonObject().put("_id", message.body()),
+                result -> {
+                    if (result.succeeded()) {
+                        byte[] mass = result.result().get(0).getJsonObject("binaryStuff").getBinary("$binary");
+                        message.reply(Buffer.buffer(mass));
+                    }
+                }
+        );
+    }
+
     private void saveDb(Message<String> message) {
         client.insert("message", new JsonObject(message.body()), this::handler);
+    }
+
+    private void savePict(Message<Buffer> message) {
+        byte[] mass = message.body().getBytes();
+        client.insert("picture", new JsonObject().put("binaryStuff", new JsonObject().put("$binary", mass)),
+                result ->
+                        message.reply(Json.encode(result.result()))
+        );
     }
 
     private void handler(AsyncResult<String> stringAsyncResult) {
         if (stringAsyncResult.succeeded()) {
             System.out.println("MongoDB save: " + stringAsyncResult.result());
-
         } else {
             System.out.println("ERROR MongoDB: " + stringAsyncResult.cause());
         }

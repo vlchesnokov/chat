@@ -1,0 +1,3 @@
+curl -i -X POST -H "Content-Type: multipart/form-data" -F "data=@c:/chat/test/tigr.jpg" http://localhost:8081/picture
+curl -X GET http://localhost:8081/picture/id 
+// Если ввести get-запрос в командную строку браузера, то отобразится нужное изображение
